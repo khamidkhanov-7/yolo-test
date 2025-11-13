@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Oddiy Blog — Muhammadzohid</title>
+  <style>
+    :root{--bg:#f6f7fb;--card:#fff;--muted:#6b7280;--accent:#2563eb}
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, Arial; margin:0; background:var(--bg); color:#111}
+    header{background:linear-gradient(90deg, #2563eb22, #06b6d422); padding:18px}
+    .wrap{max-width:900px;margin:22px auto;padding:18px}
+    h1{margin:0 0 6px;font-size:20px}
+    p.lead{margin:0;color:var(--muted)}
+
+    .card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(16,24,40,0.06);margin-top:18px}
+
+    form .row{display:flex;gap:10px;flex-wrap:wrap}
+    input[type=text], textarea{width:100%;padding:10px;border:1px solid #e6e8eb;border-radius:8px;font-size:14px}
+    textarea{min-height:100px;resize:vertical}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+    button{background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;border:0;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid #cfe3ff}
+
+    .posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:14px}
+    .post{padding:12px;border-radius:10px;background:#fff;border:1px solid #f0f3f6}
+    .post h3{margin:0 0 6px;font-size:16px}
+    .meta{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .actions{display:flex;gap:8px}
+    .actions button{padding:6px 10px;font-size:13px}
+
+    footer{max-width:900px;margin:22px auto;text-align:center;color:var(--muted);font-size:13px}
+
+    @media (max-width:520px){.wrap{padding:12px}.card{padding:12px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Oddiy Blog</h1>
+      <p class="lead">Oddiy, oson ishlatiladigan blog (ma'lumotlar brauzerda saqlanadi)</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card" aria-labelledby="formTitle">
+      <h2 id="formTitle">Yangi Post Qo'shish</h2>
+      <form id="postForm">
+        <div class="row">
+          <input id="title" type="text" placeholder="Sarlavha (masalan: Bugungi fikrlar)" required />
+        </div>
+        <div style="margin-top:8px">
+          <textarea id="content" placeholder="Matnni shu yerga yozing..." required></textarea>
+        </div>
+        <div class="controls">
+          <button type="submit">Saqlash</button>
+          <button id="clearAll" type="button" class="ghost">Hammasini o'chirish</button>
+          <span style="margin-left:auto;color:var(--muted);font-size:13px">Ma'lumotlar <strong>localStorage</strong>ga saqlanadi</span>
+        </div>
+      </form>
+    </section>
+
+    <section style="margin-top:14px">
+      <h2>Postlar</h2>
+      <div id="posts" class="posts" aria-live="polite"></div>
+      <p id="emptyHint" style="color:var(--muted);margin-top:10px">Hozircha post yo'q. Yuqoridagi forma orqali qo'shing.</p>
+    </section>
+  </main>
+
+  <footer>
+    <small>Oddiy Blog — tayyor: oddiy HTML/CSS/JS — lokal saqlash. Created by Muhammadzohid</small>
+  </footer>
+
+  <script>
+    // Oddiy blog: postlarni localStorage'da saqlaydi, tahrirlash va o'chirish imkoniyati
+    const KEY = 'oddiy_blog_posts_v1'
+    const form = document.getElementById('postForm')
+    const titleInput = document.getElementById('title')
+    const contentInput = document.getElementById('content')
+    const postsWrap = document.getElementById('posts')
+    const clearAllBtn = document.getElementById('clearAll')
+    const emptyHint = document.getElementById('emptyHint')
+
+    function readPosts(){
+      try{ return JSON.parse(localStorage.getItem(KEY)) || [] }catch(e){ return [] }
+    }
+    function writePosts(list){ localStorage.setItem(KEY, JSON.stringify(list)) }
+
+    function render(){
+      const list = readPosts()
+      postsWrap.innerHTML = ''
+      if(list.length === 0){ emptyHint.style.display = 'block' } else { emptyHint.style.display = 'none' }
+      list.slice().reverse().forEach(post => {
+        const el = document.createElement('article')
+        el.className = 'post card'
+        el.innerHTML = `
+          <h3>${escapeHtml(post.title)}</h3>
+          <div class="meta">${new Date(post.date).toLocaleString()}</div>
+          <div class="body">${escapeHtml(post.content).replace(/\n/g, '<br>')}</div>
+          <div class="actions" style="margin-top:10px">
+            <button data-id="${post.id}" class="edit">Tahrirlash</button>
+            <button data-id="${post.id}" class="delete">O'chirish</button>
+          </div>
+        `
+        postsWrap.appendChild(el)
+      })
+
+      // attach listeners
+      postsWrap.querySelectorAll('button.edit').forEach(b=>b.addEventListener('click', onEdit))
+      postsWrap.querySelectorAll('button.delete').forEach(b=>b.addEventListener('click', onDelete))
+    }
+
+    function escapeHtml(s){
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    function onEdit(e){
+      const id = e.currentTarget.dataset.id
+      const list = readPosts()
+      const post = list.find(p=>p.id == id)
+      if(!post) return alert('Topilmadi')
+      titleInput.value = post.title
+      contentInput.value = post.content
+      // remove old and save as updated on submit
+      // mark by adding a hidden field or use globals
+      form.dataset.editing = id
+      window.scrollTo({top:0,behavior:'smooth'})
+    }
+
+    function onDelete(e){
+      const id = e.currentTarget.dataset.id
+      if(!confirm('Haqiqatan o'chirmoqchimisiz?')) return
+      const list = readPosts().filter(p=>p.id != id)
+      writePosts(list)
+      render()
+    }
+
+    form.addEventListener('submit', function(ev){
+      ev.preventDefault()
+      const title = titleInput.value.trim()
+      const content = contentInput.value.trim()
+      if(!title || !content) return alert('Iltimos, sarlavha va matn kiriting')
+
+      const list = readPosts()
+      const editingId = form.dataset.editing
+      if(editingId){
+        const idx = list.findIndex(p=>p.id == editingId)
+        if(idx !== -1){ list[idx].title = title; list[idx].content = content; list[idx].date = new Date().toISOString() }
+        delete form.dataset.editing
+      } else {
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2,8)
+        list.push({id, title, content, date: new Date().toISOString()})
+      }
+      writePosts(list)
+      titleInput.value = ''
+      contentInput.value = ''
+      render()
+    })
+
+    clearAllBtn.addEventListener('click', function(){
+      if(confirm('Hammasini o\'chirilsinmi?')){
+        localStorage.removeItem(KEY)
+        render()
+      }
+    })
+
+    // initial render
+    render()
+  </script>
+</body>
+</html>
